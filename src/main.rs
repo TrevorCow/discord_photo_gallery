@@ -262,7 +262,7 @@ async fn ask_user_for_guild_channel(basic_guild_infos: Vec<BasicGuildInfo>, http
                     })
             }).collect::<Vec<_>>();
 
-        let gallery_picture_infos = futures::future::join_all(gallery_picture_infos);
+        let gallery_picture_infos = futures::future::join_all(gallery_picture_infos.into_iter());
 
         let author_name_channel = parse_author_name_from_channel_name(channel.name.as_deref().unwrap_or("No channel name?"), ChannelParseMode::FirstFullLastInitial);
 
