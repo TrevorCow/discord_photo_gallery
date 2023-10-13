@@ -247,7 +247,7 @@ async fn ask_user_for_guild_channel(basic_guild_infos: Vec<BasicGuildInfo>, http
                     .filter(is_attachment_image)
                     .map(move |attachment| {
                         let picture_description = picture_description.clone();
-                        tokio::spawn(async move {
+                        async move {
                             let discord_url = attachment.proxy_url;
                             let thumbnail_url = thumbnail_download::download_image(
                                 "test_website",
@@ -258,30 +258,27 @@ async fn ask_user_for_guild_channel(basic_guild_infos: Vec<BasicGuildInfo>, http
                                 discord_url,
                                 thumbnail_url,
                             }
-                        })
+                        }
                     })
             }).collect::<Vec<_>>();
 
-        let gallery_picture_infos = futures::future::join_all(gallery_picture_infos).await.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-
-        // let gallery_picture_infos = futures::stream::futures_unordered::FuturesUnordered::from_iter(gallery_picture_infos).collect::<Vec<_>>().await;
-        // {
-        //     let download_runtime = tokio::runtime::Runtime::new().unwrap();
-        //     download_runtime.spawn_blocking()
-        // }
-        // let gallery_picture_infos = gallery_picture_infos.into_iter().map(|g| tokio::spawn(g))
+        let gallery_picture_infos = futures::future::join_all(gallery_picture_infos);
 
         let author_name_channel = parse_author_name_from_channel_name(channel.name.as_deref().unwrap_or("No channel name?"), ChannelParseMode::FirstFullLastInitial);
 
         let gallery_title = format!("{author_name_channel} ({author_discord_name})");
 
         galleries.push(
-            Gallery {
-                gallery_title,
-                gallery_picture_infos,
+            async {
+                Gallery {
+                    gallery_title,
+                    gallery_picture_infos: gallery_picture_infos.await,
+                }
             }
         );
     }
+
+    let mut galleries = futures::stream::iter(galleries.into_iter()).buffer_unordered(4).collect::<Vec<_>>().await;
 
     galleries.sort_unstable_by(|g1, g2| g1.gallery_title.cmp(&g2.gallery_title));
 
