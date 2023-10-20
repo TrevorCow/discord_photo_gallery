@@ -12,6 +12,7 @@ use twilight_gateway::{Event, Intents, Shard, ShardId};
 use twilight_http::Client as HttpClient;
 use twilight_model::channel::{Attachment, Channel, ChannelType};
 use twilight_model::guild::Guild;
+use crate::thumbnail_download::ThumbnailDownloader;
 
 use crate::website::builder::gallery_page_info::{Gallery, GalleryPageInfo, GalleryPictureInfo};
 use crate::website::builder::render_page;
@@ -76,8 +77,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
 
     if let State::Done { guilds } = state.lock().await.deref() {
-        let jh = tokio::spawn(ask_user_for_guild_channel(guilds.clone(), http.clone()));
-        jh.await.unwrap()
+        ask_user_for_guild_channel(guilds.clone(), http.clone()).await;
     } else {
         unreachable!()
     }
@@ -213,6 +213,8 @@ async fn ask_user_for_guild_channel(basic_guild_infos: Vec<BasicGuildInfo>, http
 
     let mut galleries = Vec::new();
 
+    let thumbnail_downloader = Arc::new(std::sync::Mutex::new(ThumbnailDownloader::new()));
+
     for channel in category_channels {
         let channel_messages = http.channel_messages(channel.id).await.unwrap().model().await.unwrap();
 
@@ -228,6 +230,10 @@ async fn ask_user_for_guild_channel(basic_guild_infos: Vec<BasicGuildInfo>, http
                 }
             }
 
+            if counts.is_empty() {
+                continue;
+            }
+
             let max = counts.into_iter().max_by_key(|&(_, count)| count).unwrap();
             max.0.clone()
         };
@@ -241,44 +247,34 @@ async fn ask_user_for_guild_channel(basic_guild_infos: Vec<BasicGuildInfo>, http
                 } else {
                     Some(message.content.clone())
                 };
+                let thumbnail_downloader = thumbnail_downloader.clone();
                 message
                     .attachments
                     .into_iter()
                     .filter(is_attachment_image)
                     .map(move |attachment| {
                         let picture_description = picture_description.clone();
-                        async move {
-                            let discord_url = attachment.proxy_url;
-                            let thumbnail_url = thumbnail_download::download_image(
-                                "test_website",
-                                &discord_url,
-                            ).await;
-                            GalleryPictureInfo {
-                                picture_description,
-                                discord_url,
-                                thumbnail_url,
-                            }
+                        let discord_url = attachment.proxy_url;
+                        let thumbnail_url = thumbnail_downloader.lock().unwrap().queue_download("test_website", &discord_url);
+                        GalleryPictureInfo {
+                            picture_description,
+                            discord_url,
+                            thumbnail_url,
                         }
                     })
             }).collect::<Vec<_>>();
-
-        let gallery_picture_infos = futures::future::join_all(gallery_picture_infos.into_iter());
 
         let author_name_channel = parse_author_name_from_channel_name(channel.name.as_deref().unwrap_or("No channel name?"), ChannelParseMode::FirstFullLastInitial);
 
         let gallery_title = format!("{author_name_channel} ({author_discord_name})");
 
         galleries.push(
-            async {
-                Gallery {
-                    gallery_title,
-                    gallery_picture_infos: gallery_picture_infos.await,
-                }
+            Gallery {
+                gallery_title,
+                gallery_picture_infos,
             }
         );
     }
-
-    let mut galleries = futures::stream::iter(galleries.into_iter()).buffer_unordered(4).collect::<Vec<_>>().await;
 
     galleries.sort_unstable_by(|g1, g2| g1.gallery_title.cmp(&g2.gallery_title));
 
@@ -293,6 +289,11 @@ async fn ask_user_for_guild_channel(basic_guild_infos: Vec<BasicGuildInfo>, http
 
     let rendered_page = render_page(&gallery_page_info);
     write_whole_website_directory("test_website", &rendered_page);
+
+    {
+        let g = Arc::try_unwrap(thumbnail_downloader).unwrap_or_else(|_| panic!("")).into_inner().unwrap();
+        g.download_all().await;
+    }
 }
 
 pub enum ChannelParseMode {
@@ -323,7 +324,7 @@ fn parse_author_name_from_channel_name(channel_name: &str, channel_parse_mode: C
                 let rest_of_first_name = first_name_chars.as_str().to_ascii_lowercase();
                 let last_initial = channel_name_parts[1].chars().next().unwrap().to_ascii_uppercase();
                 format!("{}{} {}.", first_initial, rest_of_first_name, last_initial)
-            } else { // If there isn't 2 parts to the name just return the channel name, this means someone didn't name their channel right
+            } else { // If there isn't 2 parts to the name just return the channel name, this means someone didn't name their channel right (Shame!)
                 channel_name.to_owned()
             };
         }
