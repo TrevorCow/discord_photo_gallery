@@ -9,17 +9,17 @@ function onDOMFinished() {
     setupToolTips();
 }
 
-function showPreview(gimp) {
-    const previewDiv = document.querySelector("#preview");
-    if (previewDiv.children.length === 0) {
+function show_preview(gimp) {
+    const preview_div = document.querySelector("#preview");
+    if (preview_div.children.length === 0) {
         hideToolTipDiv();
         let previewImg = new Image();
         previewImg.src = gimp.dataset.fullurl;
-        previewDiv.appendChild(previewImg);
-        previewDiv.style.display = "block";
+        preview_div.appendChild(previewImg);
+        preview_div.style.display = "block";
     } else {
-        previewDiv.style.display = "none";
-        previewDiv.innerHTML = "";
+        preview_div.style.display = "none";
+        preview_div.innerHTML = "";
     }
 
 }
@@ -37,7 +37,7 @@ function setupGallery() {
     const onGalleryImageLoaded = function (gimg) {
         gimg.style.display = "inline";
         gimg.addEventListener("click", function (_event) {
-            showPreview(gimg);
+            show_preview(gimg);
         });
         resizeAllGalleries();
     }

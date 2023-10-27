@@ -2,6 +2,7 @@ use std::{env, error::Error, io, mem, sync::Arc};
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
+use std::path::PathBuf;
 use std::str::FromStr;
 use futures::StreamExt;
 
@@ -12,6 +13,7 @@ use twilight_gateway::{Event, Intents, Shard, ShardId};
 use twilight_http::Client as HttpClient;
 use twilight_model::channel::{Attachment, Channel, ChannelType};
 use twilight_model::guild::Guild;
+use url::Url;
 use crate::thumbnail_download::ThumbnailDownloader;
 
 use crate::website::builder::gallery_page_info::{Gallery, GalleryPageInfo, GalleryPictureInfo};
@@ -91,7 +93,7 @@ pub struct BasicGuildInfo {
     channels: Vec<Channel>,
 }
 
-#[derive(Debug)]
+
 pub enum State {
     PreReady {},
     Ready {
@@ -101,6 +103,44 @@ pub enum State {
     Done {
         guilds: Vec<BasicGuildInfo>,
     },
+}
+
+mod state_machine {
+    use crate::BasicGuildInfo;
+
+    pub struct PreReady;
+    pub struct Ready {
+        total_guilds_to_load: usize,
+        guilds: Vec<BasicGuildInfo>,
+    }
+    pub struct Done {
+        guilds: Vec<BasicGuildInfo>,
+    }
+
+    pub struct GalleryBuildingState<S> {
+        state: S,
+    }
+
+    impl GalleryBuildingState<PreReady> {
+        pub fn ready(self, total_guilds_to_load: usize) -> GalleryBuildingState<Ready> {
+            GalleryBuildingState {
+                state: Ready {
+                    total_guilds_to_load,
+                    guilds: Vec::new(),
+                }
+            }
+        }
+    }
+
+    impl GalleryBuildingState<Ready> {
+        pub fn done(self) -> GalleryBuildingState<Done> {
+            GalleryBuildingState {
+                state: Done {
+                    guilds: self.state.guilds
+                }
+            }
+        }
+    }
 }
 
 async fn handle_event(
@@ -135,7 +175,8 @@ async fn handle_event(
                 guilds.push(basic_guild_info);
 
                 if guilds.len() >= *total_guilds_to_load {
-                    let guilds = mem::take(guilds);
+                    let mut guilds = mem::take(guilds);
+                    guilds.sort_by(|bgi1, bgi2| bgi1.name.partial_cmp(&bgi2.name).unwrap());
                     *state = State::Done {
                         guilds
                     };
@@ -207,13 +248,14 @@ async fn ask_user_for_guild_channel(basic_guild_infos: Vec<BasicGuildInfo>, http
 
     let chosen_category = valid_guild_categories.nth(chosen_category_index).unwrap();
 
+    const WEBSITE_BUILD_DIRECTORY: &str = "built_websites";
+    let website_save_dir = PathBuf::from(WEBSITE_BUILD_DIRECTORY).join(&chosen_guild.name).join(chosen_category.name.as_ref().unwrap());
+
     let category_channels = chosen_guild.channels.iter().filter(|c| c.parent_id == Some(chosen_category.id) && c.kind == ChannelType::GuildText);
-    // let category_names = category_channels.map(|c| c.name.as_ref().unwrap()).collect::<Vec<_>>();
-    // println!("Guild category `{}` with channels: {:?}", chosen_category.name.as_ref().unwrap(), category_names);
 
     let mut galleries = Vec::new();
 
-    let thumbnail_downloader = Arc::new(std::sync::Mutex::new(ThumbnailDownloader::new()));
+    // let thumbnail_downloader = Arc::new(std::sync::Mutex::new(ThumbnailDownloader::new()));
 
     for channel in category_channels {
         let channel_messages = http.channel_messages(channel.id).await.unwrap().model().await.unwrap();
@@ -247,7 +289,7 @@ async fn ask_user_for_guild_channel(basic_guild_infos: Vec<BasicGuildInfo>, http
                 } else {
                     Some(message.content.clone())
                 };
-                let thumbnail_downloader = thumbnail_downloader.clone();
+                // let thumbnail_downloader = thumbnail_downloader.clone();
                 message
                     .attachments
                     .into_iter()
@@ -255,7 +297,16 @@ async fn ask_user_for_guild_channel(basic_guild_infos: Vec<BasicGuildInfo>, http
                     .map(move |attachment| {
                         let picture_description = picture_description.clone();
                         let discord_url = attachment.proxy_url;
-                        let thumbnail_url = thumbnail_downloader.lock().unwrap().queue_download("test_website", &discord_url);
+
+
+                        let image_url = Url::from_str(&discord_url).unwrap();
+                        let trimmed_discord_url = image_url.path().trim_start_matches('/');
+                        let attachment_save_path = PathBuf::from(WEBSITE_BUILD_DIRECTORY).join(trimmed_discord_url);
+                        thumbnail_download::queue_download(&attachment_save_path, &image_url);
+
+                        let thumbnail_url = attachment_save_path.strip_prefix(WEBSITE_BUILD_DIRECTORY).unwrap().to_string_lossy().to_string();
+
+                        // let thumbnail_url = thumbnail_downloader.lock().unwrap().queue_download("test_website", &discord_url);
                         GalleryPictureInfo {
                             picture_description,
                             discord_url,
@@ -288,11 +339,13 @@ async fn ask_user_for_guild_channel(basic_guild_infos: Vec<BasicGuildInfo>, http
     };
 
     let rendered_page = render_page(&gallery_page_info);
-    write_whole_website_directory("test_website", &rendered_page);
+    write_whole_website_directory(website_save_dir, &rendered_page);
+
+    thumbnail_download::flush_download_queue();
 
     {
-        let g = Arc::try_unwrap(thumbnail_downloader).unwrap_or_else(|_| panic!("")).into_inner().unwrap();
-        g.download_all().await;
+        // let g = Arc::try_unwrap(thumbnail_downloader).unwrap_or_else(|_| panic!("")).into_inner().unwrap();
+        // g.download_all().await;
     }
 }
 
