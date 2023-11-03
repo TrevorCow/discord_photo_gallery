@@ -1,0 +1,35 @@
+{
+  "page_title": "Test Gallery Title",
+  "galleries": [
+    {
+      "gallery_title": "Gallery 1",
+      "gallery_pictures": [
+        {
+          "description": "Picture 1 Gallery 1",
+          "discord_url": "",
+          "thumbnail_url": ""
+        },
+        {
+          "description": "Picture 2 Gallery 1",
+          "discord_url": "",
+          "thumbnail_url": ""
+        }
+      ]
+    },
+    {
+      "gallery_title": "Gallery 2",
+      "gallery_pictures": [
+        {
+          "description": "Picture 1 Gallery 2",
+          "discord_url": "",
+          "thumbnail_url": ""
+        },
+        {
+          "description": "Picture 2 Gallery 2",
+          "discord_url": "",
+          "thumbnail_url": ""
+        }
+      ]
+    }
+  ]
+}

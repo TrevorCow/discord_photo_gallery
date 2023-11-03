@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use handlebars::Handlebars;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::website::builder::gallery_page_info::GalleryPageInfo;
 
@@ -36,7 +37,8 @@ pub mod gallery_page_info {
 
     #[derive(Serialize, Deserialize)]
     pub struct GalleryPictureInfo {
-        pub(crate) picture_description: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub(crate) description: Option<String>,
         pub(crate) discord_url: String,
         pub(crate) thumbnail_url: String,
     }

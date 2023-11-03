@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" type="text/css" href="gallery-style.css">
+    <script src="gallery.js"></script>
+</head>
+<body>
+<div id="preview" onclick="show_preview(null)"></div>
+<span id="tooltip">Content 1</span>
+<h1>{{page_title}}</h1>
+
+<!--<div id="galleries">-->
+<!--    <h2>{{gallery_title}}</h2>-->
+<!--    <div class="gallery">-->
+<!--        {{#each gallery_picture_infos}}-->
+<!--        <img data-disc="{{picture_description}}" data-fullurl="{{discord_url}}" src="/{{thumbnail_url}}" alt="">-->
+<!--        {{/each}}-->
+<!--    </div>-->
+<!--</div>-->
+
+
+<hr>
+<h3>Page build from guild `{{guild_built_from}}` on {{page_built_time}}</h3>
+<h3>Website generated using rust by Trevor Rosenstrom | View the source code <a
+        href="//github.com/TrevorCow/discord_photo_gallery" target="_blank">here</a>.</h3>
+</body>
+</html>

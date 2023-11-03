@@ -1,11 +1,11 @@
-use std::{env, error::Error, io, mem, sync::Arc};
+use std::{env, error::Error, fs, io, mem, sync::Arc};
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::str::FromStr;
-use futures::StreamExt;
 
+use futures::StreamExt;
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::Mutex;
 use twilight_cache_inmemory::{InMemoryCache, ResourceType};
@@ -14,11 +14,8 @@ use twilight_http::Client as HttpClient;
 use twilight_model::channel::{Attachment, Channel, ChannelType};
 use twilight_model::guild::Guild;
 use url::Url;
-use crate::thumbnail_download::ThumbnailDownloader;
 
 use crate::website::builder::gallery_page_info::{Gallery, GalleryPageInfo, GalleryPictureInfo};
-use crate::website::builder::render_page;
-use crate::website::write_whole_website_directory;
 
 pub mod website;
 pub mod thumbnail_download;
@@ -308,7 +305,7 @@ async fn ask_user_for_guild_channel(basic_guild_infos: Vec<BasicGuildInfo>, http
 
                         // let thumbnail_url = thumbnail_downloader.lock().unwrap().queue_download("test_website", &discord_url);
                         GalleryPictureInfo {
-                            picture_description,
+                            description: picture_description,
                             discord_url,
                             thumbnail_url,
                         }
@@ -338,8 +335,11 @@ async fn ask_user_for_guild_channel(basic_guild_infos: Vec<BasicGuildInfo>, http
         page_built_time: "PAGE BUILT TIME".to_string(),
     };
 
-    let rendered_page = render_page(&gallery_page_info);
-    write_whole_website_directory(website_save_dir, &rendered_page);
+    let json_rendered = serde_json::to_string(&gallery_page_info).unwrap();
+    fs::write("json_rendered.json", json_rendered.to_string()).expect("TODO: panic message");
+
+    // let rendered_page = render_page(&gallery_page_info);
+    // write_whole_website_directory(website_save_dir, &rendered_page);
 
     thumbnail_download::flush_download_queue();
 
