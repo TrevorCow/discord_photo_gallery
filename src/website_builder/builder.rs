@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::website::builder::gallery_page_info::GalleryPageInfo;
+use crate::website_builder::builder::gallery_page_info::GalleryPageInfo;
 
 const WEBSITE_RESOURCE_GALLERY_TEMPLATE_HTML: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/website_files/gallery_template.html"));
 

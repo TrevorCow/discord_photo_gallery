@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::website::builder::RenderedPage;
+use crate::website_builder::builder::RenderedPage;
 
 pub mod builder;
 

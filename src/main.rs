@@ -15,9 +15,9 @@ use twilight_model::channel::{Attachment, Channel, ChannelType};
 use twilight_model::guild::Guild;
 use url::Url;
 
-use crate::website::builder::gallery_page_info::{Gallery, GalleryPageInfo, GalleryPictureInfo};
+use crate::website_builder::builder::gallery_page_info::{Gallery, GalleryPageInfo, GalleryPictureInfo};
 
-pub mod website;
+pub mod website_builder;
 pub mod thumbnail_download;
 
 #[tokio::main]
